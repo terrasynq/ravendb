@@ -633,11 +633,28 @@ namespace Raven.Database.Queries
                 {
                     case SortOptions.String:
                     case SortOptions.StringVal:
-                    case SortOptions.Byte:
-                    case SortOptions.Short:
                     case SortOptions.Custom:
                     case SortOptions.None:
-                        throw new InvalidOperationException(string.Format("Cannot perform numeric aggregation on index field '{0}'. You must set the Sort mode of the field to Int, Float, Long or Double.", TryTrimRangeSuffix(facet.AggregationField)));
+                        if (facet.Aggregation.HasFlag(FacetAggregation.Max) || facet.Aggregation.HasFlag(FacetAggregation.Min) || facet.Aggregation.HasFlag(FacetAggregation.Sum) || facet.Aggregation.HasFlag(FacetAggregation.Average))
+                            throw new InvalidOperationException(string.Format("Cannot perform numeric aggregation on index field '{0}'. You must set the Sort mode of the field to Int, Float, Long or Double.", TryTrimRangeSuffix(facet.AggregationField)));
+
+                        string[] strings = FieldCache_Fields.DEFAULT.GetStrings(indexReader, facet.AggregationField);
+
+                        if (facet.Aggregation.HasFlag(FacetAggregation.UniqueCount))
+                        {
+                            var newValues = new HashSet<string>();
+                            for (int index = 0; index < docsInQuery.Count; index++)
+                            {
+                                var doc = docsInQuery.Array[index];
+                                newValues.Add(strings[doc - docBase]);
+                            }
+
+                            value.Count = newValues.Count();
+                        }
+                        break;
+                    case SortOptions.Byte:
+                    case SortOptions.Short:
+                        throw new InvalidOperationException(string.Format("Cannot perform numeric aggregation 1 on index field '{0}'. You must set the Sort mode of the field to Int, Float, Long or Double.", TryTrimRangeSuffix(facet.AggregationField)));
                     case SortOptions.Int:
                         int[] ints = FieldCache_Fields.DEFAULT.GetInts(indexReader, facet.AggregationField);
                         for (int index = 0; index < docsInQuery.Count; index++)
